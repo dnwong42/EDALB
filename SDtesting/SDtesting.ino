@@ -3,15 +3,19 @@
 // URL http://www.radiation-watch.org/
 //////////////////////////////////////////////////
 
-#include <SD.h>
 #include <SPI.h>
-//#include <stdlib.h>
+#include <SD.h>
+#include <stdlib.h>
 #include <avr/dtostrf.h>
 
-//File myFile;
-//int SDpinCS = 5;
-
-
+/// SD variables  ///
+int SDpinSelect = 4;
+int saveFrequency = 5;  //write data every x seconds
+bool saved = false;     //boolean to prevent multiple saves of the same data
+int geigerNum0 = 0;
+int geigerNum1 = 1;
+int geigerNum2 = 2;
+/////////////////////
 
 ///　Digital I/O PIN Settings　///
 int signPin = 2; //Radiation Pulse (Yellow)
@@ -61,26 +65,9 @@ char uSvdBuff[20];
 
 void setup()
 {
-
   //Serial setup
   //9600bps
   Serial.begin(9600);
-
-//  pinMode(SDpinCS, OUTPUT);
-
-//  if (SD.begin())
-//  {
-//    Serial.println("SD card is ready to use.");
-//  } else
-//  {
-//    Serial.println("SD card initialization failed");
-//    return;
-//  }
-
-//  myFile = SD.open("test.txt", FILE_WRITE);
-  
-
-
 
   //PIN setting for Radiation Pulse
   pinMode(signPin, INPUT);
@@ -217,28 +204,42 @@ void loop()
         dtostrf(0, -1, 3, uSvdBuff);
       }
 
-      //Create message for serial port
-//      sprintf(msg, "%d,%d.%03d,%d,%s,%s,%s",
-//              totalHour, totalSec,
-//              cpmTimeMSec,
-//              signCount,
-//              cpmBuff,
-//              uSvBuff,
-//              uSvdBuff
-//             );
-//
-//      //Send message to serial port
-//      Serial.println(msg);
+      if ((totalSec % 5 == 0) && !saved)
+      {
+        saved = true;
+        Serial.println(saved);
 
-        int geigerNum = 1;
-        writeRadiationToSDcard(geigerNum, totalHour, totalSec,
-              cpmTimeMSec,
-              signCount,
-              cpmBuff,
-              uSvBuff,
-              uSvdBuff);
+        //Write to Geiger 0
+        writeRadiationToSDcard(geigerNum0, totalHour, totalSec,
+                               cpmTimeMSec,
+                               signCount,
+                               cpmBuff,
+                               uSvBuff,
+                               uSvdBuff);
+
+        //Write to Geiger 1
+        writeRadiationToSDcard(geigerNum1, totalHour, totalSec,
+                               cpmTimeMSec,
+                               signCount,
+                               cpmBuff,
+                               uSvBuff,
+                               uSvdBuff);
+
+        //Write to Geiger 2
+        writeRadiationToSDcard(geigerNum2, totalHour, totalSec,
+                               cpmTimeMSec,
+                               signCount,
+                               cpmBuff,
+                               uSvBuff,
+                               uSvdBuff);
+      }
+      else if ((totalSec % 5 != 0) && saved)
+      {
+        saved = false;
+      }
 
     }
+
 
     //Initialization for next 10000 loops
     prevTime = currTime;
@@ -249,34 +250,42 @@ void loop()
   loopIndex++;
 }
 
+
 void writeRadiationToSDcard(int geigerNum, int totalHour, int totalSec,
-              double cpmTimeMSec,
-              int signCount,
-              char cpmBuff,
-              char uSvBuff,
-              char uSvdBuff)
+                            double cpmTimeMSec,
+                            int signCount,
+                            char cpmBuff[],
+                            char uSvBuff[],
+                            char uSvdBuff[])
 {
-    sprintf(msg, "%c,%d,%d.%03d,%d,%s,%s,%s",
-              geigerNum, totalHour, totalSec,
-              cpmTimeMSec,
-              signCount,
-              cpmBuff,
-              uSvBuff,
-              uSvdBuff
-             );
-    Serial.println(msg);
-//  myFile = SD.open("test.txt", FILE_WRITE);
-//  if (myFile)
-//  {
-//    sprintf(msg, "%d, %d, %c, %f, %f", totalHour, totalSec, geigerNum, saveCPM, saveuSV);
-//    Serial.println(msg);
-//    //myFile.println(geigerNum +", " + saveCPM + ", " + saveuSV + ", ");
-//    //myFile.print(totalHour + ":" + totalSec););
-//
-//    myFile.close();
-//  }
-//  else 
-//  {
-//    Serial.println("error opening test.txt");
-//  }
+  if (SD.begin(SDpinSelect))
+  {
+    Serial.println("SD card is ready");
+  }
+  else
+  {
+    Serial.println("SD card init fail");
+  }
+  sprintf(msg, "%d,%d,%d.%03d,%d,%s,%s,%s",
+          geigerNum, totalHour, totalSec,
+          cpmTimeMSec,
+          signCount,
+          cpmBuff,
+          uSvBuff,
+          uSvdBuff
+         );
+  Serial.println("The message below will be saved onto the SD card");
+  Serial.println(msg);
+
+  File myFile = SD.open("test.txt", FILE_WRITE);
+
+  if (myFile)
+  {
+    myFile.println(msg);
+    myFile.close();
+  }
+  else
+  {
+    Serial.println("error opening test.txt");
+  }
 }
